@@ -1,0 +1,158 @@
+{
+  "entities": {
+    "SubtitleProject": {
+      "title": "SubtitleProject",
+      "description": "Represents a video subtitle generation and Bengali translation job with processing status and export metadata.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the project owner."
+        },
+        "title": {
+          "type": "string",
+          "description": "Human-readable project title."
+        },
+        "fileName": {
+          "type": "string",
+          "description": "Original uploaded video file name."
+        },
+        "mimeType": {
+          "type": "string",
+          "description": "Video MIME type (MP4, MOV, or MKV)."
+        },
+        "fileSizeBytes": {
+          "type": "integer",
+          "description": "File size in bytes."
+        },
+        "durationMs": {
+          "type": "integer",
+          "description": "Video duration in milliseconds."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "queued",
+            "extracting",
+            "uploading",
+            "transcribing",
+            "translating",
+            "ready",
+            "exporting",
+            "exported",
+            "failed"
+          ],
+          "description": "Current pipeline stage."
+        },
+        "progressPercent": {
+          "type": "integer",
+          "description": "Overall processing progress from 0 to 100."
+        },
+        "processingMode": {
+          "type": "string",
+          "enum": ["cloud_ai", "ffmpeg_backend"],
+          "description": "Execution backend used for transcription and subtitle rendering."
+        },
+        "remoteJobId": {
+          "type": "string",
+          "description": "Optional remote FFmpeg backend job identifier."
+        },
+        "localVideoUri": {
+          "type": "string",
+          "description": "Optional local device content URI for video playback and export."
+        },
+        "exportedMp4Path": {
+          "type": "string",
+          "description": "Optional path or URI of the burned-in MP4 export."
+        },
+        "cueCount": {
+          "type": "integer",
+          "description": "Total number of generated Bengali subtitle cues."
+        },
+        "errorMessage": {
+          "type": "string",
+          "description": "Optional failure description when status is failed."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when project was created (submitted via FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when project was last updated (submitted via FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "title",
+        "fileName",
+        "mimeType",
+        "fileSizeBytes",
+        "durationMs",
+        "status",
+        "progressPercent",
+        "processingMode",
+        "cueCount",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "CuePage": {
+      "title": "CuePage",
+      "description": "Paginated batch of up to 100 synchronized English/Bengali subtitle cues for a project.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owner."
+        },
+        "projectId": {
+          "type": "string",
+          "description": "Parent SubtitleProject document ID."
+        },
+        "pageIndex": {
+          "type": "integer",
+          "description": "Zero-based page index."
+        },
+        "cues": {
+          "type": "array",
+          "description": "Bounded list of up to 100 subtitle cue objects."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "userId",
+        "projectId",
+        "pageIndex",
+        "cues",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/projects/{projectId}": {
+      "schema": {
+        "$ref": "#/entities/SubtitleProject"
+      },
+      "description": "User-scoped subtitle processing projects and history."
+    },
+    "/users/{userId}/projects/{projectId}/cuePages/{pageId}": {
+      "schema": {
+        "$ref": "#/entities/CuePage"
+      },
+      "description": "Paginated Bengali subtitle cues belonging to a project."
+    }
+  }
+}

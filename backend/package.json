@@ -1,0 +1,16 @@
+{
+  "name": "banglasub-ai-backend",
+  "version": "1.1.0",
+  "description": "Chunked video upload, FFmpeg audio extraction, AI English-to-Bengali transcription, and hard-burn MP4 export backend for BanglaSub AI.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test server.test.js"
+  },
+  "dependencies": {
+    "@google/genai": "^0.14.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "uuid": "^11.1.0"
+  }
+}

@@ -1,0 +1,29 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/banglasub-backend', '.']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/banglasub-backend']
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'banglasub-backend'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/banglasub-backend'
+      - '--region'
+      - 'asia-southeast1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '4Gi'
+      - '--cpu'
+      - '2'
+      - '--no-cpu-throttling'
+      - '--max-instances'
+      - '1'
+      - '--timeout'
+      - '3600'
+images:
+  - 'gcr.io/$PROJECT_ID/banglasub-backend'

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <files-path name="exported_videos" path="exports/" />
+    <files-path name="exported_srt" path="subtitles/" />
+    <cache-path name="temp_media" path="." />
+</paths>

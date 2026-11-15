@@ -1,0 +1,6 @@
+{
+  "name": "BanglaSub AI",
+  "description": "Upload English videos to generate, edit, preview, and burn synchronized Bengali subtitles into MP4 exports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

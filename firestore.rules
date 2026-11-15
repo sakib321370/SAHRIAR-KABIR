@@ -1,0 +1,151 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global safety net: deny all reads and writes by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidProjectStatus(status) {
+      return status in [
+        'queued',
+        'extracting',
+        'uploading',
+        'transcribing',
+        'translating',
+        'ready',
+        'exporting',
+        'exported',
+        'failed'
+      ];
+    }
+
+    function isValidProcessingMode(mode) {
+      return mode in ['cloud_ai', 'ffmpeg_backend'];
+    }
+
+    function isValidSubtitleProject(data, userId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             data.userId == request.auth.uid &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 160 &&
+             data.fileName is string && data.fileName.size() >= 1 && data.fileName.size() <= 200 &&
+             data.mimeType is string && data.mimeType.size() >= 1 && data.mimeType.size() <= 80 &&
+             data.fileSizeBytes is int && data.fileSizeBytes >= 0 &&
+             data.durationMs is int && data.durationMs >= 0 &&
+             data.status is string && isValidProjectStatus(data.status) &&
+             data.progressPercent is int && data.progressPercent >= 0 && data.progressPercent <= 100 &&
+             data.processingMode is string && isValidProcessingMode(data.processingMode) &&
+             data.cueCount is int && data.cueCount >= 0 && data.cueCount <= 50000 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time &&
+             (!('remoteJobId' in data) || data.remoteJobId == null || (data.remoteJobId is string && data.remoteJobId.size() <= 128)) &&
+             (!('localVideoUri' in data) || data.localVideoUri == null || (data.localVideoUri is string && data.localVideoUri.size() <= 1000)) &&
+             (!('exportedMp4Path' in data) || data.exportedMp4Path == null || (data.exportedMp4Path is string && data.exportedMp4Path.size() <= 1000)) &&
+             (!('errorMessage' in data) || data.errorMessage == null || (data.errorMessage is string && data.errorMessage.size() <= 500));
+    }
+
+    function isValidCuePage(data, userId, projectId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             data.userId == request.auth.uid &&
+             data.projectId is string &&
+             data.projectId == projectId &&
+             data.pageIndex is int && data.pageIndex >= 0 && data.pageIndex <= 500 &&
+             data.cues is list && data.cues.size() <= 100 &&
+             (data.cues.size() == 0 || data.cues[0] is map) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    match /users/{userId}/projects/{projectId} {
+      allow list: if isOwner(userId);
+      allow get: if isOwner(userId) && isValidId(projectId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(projectId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'title', 'fileName', 'mimeType', 'fileSizeBytes',
+                         'durationMs', 'status', 'progressPercent', 'processingMode',
+                         'cueCount', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'title', 'fileName', 'mimeType', 'fileSizeBytes',
+                         'durationMs', 'status', 'progressPercent', 'processingMode',
+                         'remoteJobId', 'localVideoUri', 'exportedMp4Path',
+                         'cueCount', 'errorMessage', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidSubtitleProject(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(projectId) &&
+                       isValidSubtitleProject(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       (
+                         // Action 1: Update processing progress/status/job metadata
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'status', 'progressPercent', 'remoteJobId', 'durationMs',
+                           'cueCount', 'errorMessage', 'updatedAt'
+                         ]) ||
+                         // Action 2: Update project title or export artifact paths
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'title', 'status', 'progressPercent', 'exportedMp4Path',
+                           'localVideoUri', 'cueCount', 'errorMessage', 'updatedAt'
+                         ])
+                       );
+
+      allow delete: if isOwner(userId) && isValidId(projectId);
+
+      match /cuePages/{pageId} {
+        allow list: if isOwner(userId) && isValidId(projectId);
+        allow get: if isOwner(userId) && isValidId(projectId) && isValidId(pageId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(projectId) &&
+                         isValidId(pageId) &&
+                         incoming().keys().hasAll([
+                           'userId', 'projectId', 'pageIndex', 'cues', 'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'userId', 'projectId', 'pageIndex', 'cues', 'createdAt', 'updatedAt'
+                         ]) &&
+                         isValidCuePage(incoming(), userId, projectId) &&
+                         exists(/databases/$(database)/documents/users/$(userId)/projects/$(projectId));
+
+        allow update: if isOwner(userId) &&
+                         isValidId(projectId) &&
+                         isValidId(pageId) &&
+                         isValidCuePage(incoming(), userId, projectId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().projectId == existing().projectId &&
+                         incoming().pageIndex == existing().pageIndex &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['cues', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(projectId) && isValidId(pageId);
+      }
+    }
+  }
+}
